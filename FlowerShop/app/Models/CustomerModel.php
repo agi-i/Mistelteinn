@@ -6,21 +6,22 @@ use CodeIgniter\Model;
 
 class CustomerModel extends Model
 {
-    // Database table for customers
+    // Matches the 'customers' table in your database
     protected $table = 'customers';
 
     // Primary key column
     protected $primaryKey = 'id';
 
-    // Return arrays for easy view rendering
+    // Return associative arrays
     protected $returnType = 'array';
 
-    // Columns allowed to be written by the model
+    // Actual columns in your customers table (excluding auto-managed id and created_at)
     protected $allowedFields = [
-        'name',
+        'full_name',
         'email',
         'phone',
     ];
 
-    protected $useTimestamps = true;
+    // Disable automatic updated_at since the table only has created_at
+    protected $useTimestamps = false;
 }

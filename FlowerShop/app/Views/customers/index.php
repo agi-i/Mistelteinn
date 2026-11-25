@@ -1,52 +1,107 @@
-<!-- app/Views/customers/index.php -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Customers</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customers - POS System - TFA1</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .page-wrapper { max-width: 1100px; margin: 0 auto; }
+        nav { background: #2c3e50; padding: 12px 20px; border-radius: 6px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08); }
+        nav a { color: white; margin-right: 20px; text-decoration: none; font-weight: bold; }
+        nav a:hover { text-decoration: underline; color: #1abc9c; }
+        .card { background: #ffffff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); border: 1px solid #e3e8ec; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; padding-bottom: 14px; border-bottom: 2px solid #eef2f4; margin-bottom: 16px; }
+        .header-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        h1 { color: #2c3e50; margin: 0; font-size: 24px; }
+        .btn { display: inline-block; background: #2c3e50; color: #fff; padding: 8px 14px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 14px; border: none; cursor: pointer; transition: background-color 0.15s ease, color 0.15s ease; }
+        .btn:hover { background: #1f2d3d; color: #1abc9c; }
+        .btn-back { background: #eef2f4; color: #2c3e50; border: 1px solid #cfd8de; }
+        .btn-back:hover { background: #dfe6ea; color: #2c3e50; }
+        .btn-accent { background: #16a085; color: #fff; }
+        .btn-accent:hover { background: #12876f; color: #fff; }
+        .btn-danger { background: #b91c1c; color: #fff; }
+        .btn-danger:hover { background: #991b1b; color: #fff; }
+        .alert { background: #fff; border-left: 4px solid #1abc9c; padding: 12px 16px; margin-bottom: 16px; border-radius: 5px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
+        .alert-error { border-left-color: #b91c1c; background: #fef2f2; color: #7f1d1d; }
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { border: 1px solid #e1e6ea; padding: 12px; text-align: left; vertical-align: middle; }
+        th { background-color: #f8f9fa; color: #2c3e50; font-size: 14px; }
+        tr:nth-child(even) { background-color: #fafbfc; }
+        tr:hover { background-color: #f2f8f7; }
+        .actions { display: flex; gap: 8px; align-items: center; }
+    </style>
 </head>
 <body>
-    <h1>Customers</h1>
+    <div class="page-wrapper">
+        <!-- Shared single-bar navigation -->
+        <nav>
+            <a href="<?= base_url('/') ?>">Home</a>
+            <a href="<?= base_url('/about') ?>">About</a>
+            <a href="<?= base_url('/products') ?>">Products</a>
+            <a href="<?= base_url('/customers') ?>">Customer Accounts</a>
+            <a href="<?= base_url('/users') ?>">User Accounts</a>
+        </nav>
 
-    <?php if (session()->getFlashdata('message')): ?>
-        <p><?= esc(session()->getFlashdata('message')) ?></p>
-    <?php endif; ?>
-    <?php if (session()->getFlashdata('error')): ?>
-        <p><?= esc(session()->getFlashdata('error')) ?></p>
-    <?php endif; ?>
+        <div class="card">
+            <div class="page-header">
+                <div class="header-left">
+                    <a href="<?= base_url('/') ?>" class="btn btn-back">&larr; Back</a>
+                    <h1>Customer Accounts</h1>
+                </div>
+                <a href="<?= base_url('/customers/new') ?>" class="btn btn-accent">+ Add Customer</a>
+            </div>
 
-    <a href="<?= site_url('customers/new') ?>">+ Add Customer</a>
-
-    <table border="1" cellpadding="8" cellspacing="0">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php if (!empty($customers)): ?>
-                <?php foreach ($customers as $customer): ?>
-                    <tr>
-                        <td><?= esc($customer['name']) ?></td>
-                        <td><?= esc($customer['email'] ?? '-') ?></td>
-                        <td><?= esc($customer['phone'] ?? '-') ?></td>
-                        <td>
-                            <a href="<?= site_url('customers/' . $customer['id'] . '/edit') ?>">Edit</a>
-                            <form action="<?= site_url('customers/' . $customer['id']) ?>" method="post" style="display:inline;" onsubmit="return confirm('Delete this customer?');">
-                                <?= csrf_field() ?>
-                                <input type="hidden" name="_method" value="DELETE">
-                                <button type="submit">Delete</button>
-                            </form>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php else: ?>
-                <tr><td colspan="4">No customers found.</td></tr>
+            <?php if (session()->getFlashdata('message')): ?>
+                <div class="alert"><?= esc(session()->getFlashdata('message')) ?></div>
             <?php endif; ?>
-        </tbody>
-    </table>
+
+            <?php if (session()->getFlashdata('error')): ?>
+                <div class="alert alert-error"><?= esc(session()->getFlashdata('error')) ?></div>
+            <?php endif; ?>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Full Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Created At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($customers)): ?>
+                            <?php foreach ($customers as$customer): ?>
+                                <tr>
+                                    <td><strong><?= esc($customer['full_name'] ?? '') ?></strong></td>
+                                    <td><?= esc($customer['email'] ?? '-') ?></td>
+                                    <td><?= esc($customer['phone'] ?? '-') ?></td>
+                                    <td><?= esc($customer['created_at'] ?? '-') ?></td>
+                                    <td>
+                                        <div class="actions">
+                                            <a href="<?= base_url('/customers/' . esc($customer['id']) . '/edit') ?>" class="btn">Edit</a>
+                                            <form action="<?= base_url('/customers/' . esc($customer['id'])) ?>" method="post" onsubmit="return confirm('Delete this customer?');">
+                                                <?= csrf_field() ?>
+                                                <input type="hidden" name="_method" value="DELETE">
+                                                <button type="submit" class="btn btn-danger">Delete</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else: ?>
+                            <tr>
+                                <td colspan="5">No customers found.</td>
+                            </tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POS System - TFA1</title>
+    <title>Mistelteinn Flower Shop</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
         nav { background: #2c3e50; padding: 12px 20px; border-radius: 6px; margin-bottom: 20px; }
@@ -20,6 +20,8 @@
     <nav>
         <a href="<?= base_url('/') ?>">Home</a>
         <a href="<?= base_url('/about') ?>">About</a>
+        <a href="<?= base_url('/products') ?>">Products</a>
+        <a href="<?= base_url('/sales') ?>">Sales</a>
         <a href="<?= base_url('/customers') ?>">Customer Accounts</a>
         <a href="<?= base_url('/users') ?>">User Accounts</a>
     </nav>

@@ -13,10 +13,10 @@ class CustomerController extends BaseController
         $this->customerModel = new CustomerModel();
     }
 
-    // READ (List all customers)
+    // READ: List all customers ordered by full_name
     public function index()
     {
-        $customers = $this->customerModel->orderBy('name', 'ASC')->findAll();
+        $customers = $this->customerModel->orderBy('full_name', 'ASC')->findAll();
 
         return view('customers/index', [
             'customers' => $customers,
@@ -31,13 +31,13 @@ class CustomerController extends BaseController
         ]);
     }
 
-    // CREATE action (save new customer)
+    // CREATE action: Validate and save a new customer
     public function create()
     {
         $rules = [
-            'name'  => 'required|min_length[2]|max_length[150]',
-            'email' => 'permit_empty|valid_email|max_length[150]',
-            'phone' => 'permit_empty|max_length[40]',
+            'full_name' => 'required|min_length[2]|max_length[150]',
+            'email'     => 'permit_empty|valid_email|max_length[150]',
+            'phone'     => 'permit_empty|max_length[40]',
         ];
 
         if (!$this->validate($rules)) {
@@ -45,9 +45,9 @@ class CustomerController extends BaseController
         }
 
         $this->customerModel->insert([
-            'name'  => $this->request->getPost('name'),
-            'email' => $this->request->getPost('email'),
-            'phone' => $this->request->getPost('phone'),
+            'full_name' => $this->request->getPost('full_name'),
+            'email'     => $this->request->getPost('email'),
+            'phone'     => $this->request->getPost('phone'),
         ]);
 
         return redirect()->to('/customers')->with('message', 'Customer added successfully.');
@@ -67,7 +67,7 @@ class CustomerController extends BaseController
         ]);
     }
 
-    // UPDATE action (save changes to existing customer)
+    // UPDATE action: Validate and save changes to an existing customer
     public function update($id = null)
     {
         $customer = $this->customerModel->find($id);
@@ -77,9 +77,9 @@ class CustomerController extends BaseController
         }
 
         $rules = [
-            'name'  => 'required|min_length[2]|max_length[150]',
-            'email' => 'permit_empty|valid_email|max_length[150]',
-            'phone' => 'permit_empty|max_length[40]',
+            'full_name' => 'required|min_length[2]|max_length[150]',
+            'email'     => 'permit_empty|valid_email|max_length[150]',
+            'phone'     => 'permit_empty|max_length[40]',
         ];
 
         if (!$this->validate($rules)) {
@@ -87,15 +87,15 @@ class CustomerController extends BaseController
         }
 
         $this->customerModel->update($id, [
-            'name'  => $this->request->getPost('name'),
-            'email' => $this->request->getPost('email'),
-            'phone' => $this->request->getPost('phone'),
+            'full_name' => $this->request->getPost('full_name'),
+            'email'     => $this->request->getPost('email'),
+            'phone'     => $this->request->getPost('phone'),
         ]);
 
         return redirect()->to('/customers')->with('message', 'Customer updated successfully.');
     }
 
-    // DELETE action
+    // DELETE action: Remove a customer by ID
     public function delete($id = null)
     {
         $customer = $this->customerModel->find($id);
