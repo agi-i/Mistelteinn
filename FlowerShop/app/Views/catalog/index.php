@@ -5,7 +5,7 @@ foreach ($cartItems as $item) {
     $cartCount += (int) ($item['quantity'] ?? 0);
 }
 ?>
-<?= view('partials/header', ['pageTitle' => 'Catalog - Mistelteinn']) ?>
+<?= view('partials/header', ['pageTitle' => 'Catalog - Mistelteinns']) ?>
 
 <style>
     .cart-status {
@@ -148,7 +148,7 @@ foreach ($cartItems as $item) {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: #16a085;
+        background: #1c8ff7;
         color: #ffffff;
         padding: 9px 14px;
         border-radius: 5px;

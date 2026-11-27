@@ -17,7 +17,8 @@ class UserModel extends Model
 
     // Fields permitted for insert/update
     protected $allowedFields = [
-        'name',
+        'username',
+        'full_name',
         'email',
         'password',
         'role',
@@ -25,6 +26,8 @@ class UserModel extends Model
     ];
 
     protected $useTimestamps = true;
+    protected $createdField  = 'created_at';
+    protected $updatedField  = '';
 
     // Model callbacks to automatically hash plain passwords before insert/update
     protected $beforeInsert = ['hashPassword'];

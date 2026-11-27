@@ -104,12 +104,24 @@ $pageTitle = ($isEdit ? 'Edit User' : 'Add User') . ' - Mistelteinn';
         <?php endif; ?>
 
         <div class="form-group">
-            <label for="name">Name</label>
+            <label for="username">Username</label>
             <input
                 type="text"
-                id="name"
-                name="name"
-                value="<?= esc(old('name', $user['name'] ?? '')) ?>"
+                id="username"
+                name="username"
+                value="<?= esc(old('username', $user['username'] ?? '')) ?>"
+                placeholder="e.g., tsaritsa"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="full_name">Full Name</label>
+            <input
+                type="text"
+                id="full_name"
+                name="full_name"
+                value="<?= esc(old('full_name', $user['full_name'] ?? $user['name'] ?? '')) ?>"
                 placeholder="e.g., Maria Santos"
                 required
             >
@@ -139,10 +151,11 @@ $pageTitle = ($isEdit ? 'Edit User' : 'Add User') . ' - Mistelteinn';
 
         <div class="form-group">
             <label for="role">Role</label>
-            <?php $selectedRole = old('role', $user['role'] ?? 'staff'); ?>
+            <?php $selectedRole = strtolower(trim((string) old('role', $user['role'] ?? 'staff'))); ?>
             <select id="role" name="role" required>
                 <option value="staff" <?= $selectedRole === 'staff' ? 'selected' : '' ?>>Staff</option>
                 <option value="cashier" <?= $selectedRole === 'cashier' ? 'selected' : '' ?>>Cashier</option>
+                <option value="owner" <?= $selectedRole === 'owner' ? 'selected' : '' ?>>Owner</option>
                 <option value="admin" <?= $selectedRole === 'admin' ? 'selected' : '' ?>>Admin</option>
             </select>
         </div>

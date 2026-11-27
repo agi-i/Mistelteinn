@@ -40,7 +40,7 @@
         }
         nav a:hover,
         nav a.active {
-            color: #1abc9c;
+            color: #9fc5e8;
             text-decoration: underline;
         }
 
@@ -106,7 +106,7 @@
         }
         .btn:hover {
             background: #1f2d3d;
-            color: #1abc9c;
+            color: #1c8ff7;
         }
         .btn-back {
             background: #eef2f4;
@@ -118,11 +118,11 @@
             color: #2c3e50;
         }
         .btn-accent {
-            background: #16a085;
+            background: #1c8ff7;
             color: #ffffff;
         }
         .btn-accent:hover {
-            background: #12876f;
+            background: #8bbdeb;
             color: #ffffff;
         }
         .btn-light {

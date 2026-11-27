@@ -23,5 +23,8 @@ class CustomerModel extends Model
     ];
 
     // Disable automatic updated_at since the table only has created_at
-    protected $useTimestamps = false;
+    protected $useTimestamps = true;
+    protected $dateFormat    = 'datetime';
+    protected $createdField  = 'created_at';
+    protected $updatedField  = ''; // or set to '' if your table has no updated_at column
 }

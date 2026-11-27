@@ -32,14 +32,27 @@
             <tbody>
                 <?php if (!empty($customers)): ?>
                     <?php foreach ($customers as $customer): ?>
+                        <?php
+                        $customerId   = (int) ($customer['id'] ?? 0);
+                        $customerName = $customer['full_name'] ?? $customer['name'] ?? 'this customer';
+                        ?>
                         <tr>
-                            <td><strong><?= esc($customer['full_name'] ?? $customer['name'] ?? '') ?></strong></td>
+                            <td><strong><?= esc($customerName) ?></strong></td>
                             <td><?= esc($customer['email'] ?? '') ?></td>
                             <td><?= esc($customer['phone'] ?? '') ?></td>
                             <td><?= esc($customer['created_at'] ?? '—') ?></td>
                             <td>
                                 <div class="btn-group">
-                                    <a href="<?= base_url('/customers/edit/' . esc($customer['id'])) ?>" class="btn">Edit</a>
+                                    <a href="<?= base_url('/customers/edit/' . $customerId) ?>" class="btn">Edit</a>
+                                    <form
+                                        action="<?= base_url('/customers/delete/' . $customerId) ?>"
+                                        method="post"
+                                        style="display: inline;"
+                                        onsubmit="return confirm('Delete <?= esc(addslashes($customerName), 'js') ?>?');"
+                                    >
+                                        <?= csrf_field() ?>
+                                        <button type="submit" class="btn btn-danger">Delete</button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>

@@ -83,11 +83,12 @@ class UserController extends BaseController
     public function create()
     {
         $rules = [
-            'name'     => 'required|min_length[2]|max_length[150]',
-            'email'    => 'required|valid_email|is_unique[users.email]',
-            'password' => 'required|min_length[6]',
-            'role'     => 'required|in_list[admin,cashier,staff]',
-            'avatar'   => 'permit_empty|is_image[avatar]|mime_in[avatar,image/jpg,image/jpeg,image/png,image/webp]|max_size[avatar,2048]',
+            'username'  => 'required|min_length[3]|max_length[100]|is_unique[users.username]',
+            'full_name' => 'required|min_length[2]|max_length[150]',
+            'email'     => 'required|valid_email|is_unique[users.email]',
+            'password'  => 'required|min_length[6]',
+            'role'      => 'required|in_list[admin,cashier,staff,owner]',
+            'avatar'    => 'permit_empty|is_image[avatar]|mime_in[avatar,image/jpg,image/jpeg,image/png,image/webp]|max_size[avatar,2048]',
         ];
 
         if (!$this->validate($rules)) {
@@ -97,11 +98,12 @@ class UserController extends BaseController
         $avatarName = $this->handleAvatarUpload();
 
         $this->userModel->insert([
-            'name'     => $this->request->getPost('name'),
-            'email'    => $this->request->getPost('email'),
-            'password' => $this->request->getPost('password'),
-            'role'     => $this->request->getPost('role'),
-            'avatar'   => $avatarName,
+            'username'  => $this->request->getPost('username'),
+            'full_name' => $this->request->getPost('full_name'),
+            'email'     => $this->request->getPost('email'),
+            'password'  => $this->request->getPost('password'),
+            'role'      => $this->request->getPost('role'),
+            'avatar'    => $avatarName,
         ]);
 
         return redirect()->to('/users')->with('message', 'Staff member created successfully.');
@@ -139,11 +141,12 @@ class UserController extends BaseController
             : 'permit_empty';
 
         $rules = [
-            'name'     => 'required|min_length[2]|max_length[150]',
-            'email'    => "required|valid_email|is_unique[users.email,id,{$id}]",
-            'password' => $passwordRule,
-            'role'     => 'required|in_list[admin,cashier,staff]',
-            'avatar'   => 'permit_empty|is_image[avatar]|mime_in[avatar,image/jpg,image/jpeg,image/png,image/webp]|max_size[avatar,2048]',
+            'username'  => "required|min_length[3]|max_length[100]|is_unique[users.username,id,{$id}]",
+            'full_name' => 'required|min_length[2]|max_length[150]',
+            'email'     => "required|valid_email|is_unique[users.email,id,{$id}]",
+            'password'  => $passwordRule,
+            'role'      => 'required|in_list[admin,cashier,staff,owner]',
+            'avatar'    => 'permit_empty|is_image[avatar]|mime_in[avatar,image/jpg,image/jpeg,image/png,image/webp]|max_size[avatar,2048]',
         ];
 
         if (!$this->validate($rules)) {
@@ -161,10 +164,11 @@ class UserController extends BaseController
         }
 
         $data = [
-            'name'   => $this->request->getPost('name'),
-            'email'  => $this->request->getPost('email'),
-            'role'   => $this->request->getPost('role'),
-            'avatar' => $avatarName,
+            'username'  => $this->request->getPost('username'),
+            'full_name' => $this->request->getPost('full_name'),
+            'email'     => $this->request->getPost('email'),
+            'role'      => $this->request->getPost('role'),
+            'avatar'    => $avatarName,
         ];
 
         // Only include password if user typed a new one
@@ -178,13 +182,61 @@ class UserController extends BaseController
         return redirect()->to('/users')->with('message', 'Staff member updated successfully.');
     }
 
-    // DELETE staff user and remove avatar file
-    public function delete($id = null)
-    {
-        $user = $this->userModel->find($id);
+    // DELETE staff user, reassign sales, and remove avatar file
+public function delete($id = null)
+{
+    $userId = (int) $id;
+    $user   = $this->userModel->find($userId);
 
-        if (!$user) {
-            return redirect()->to('/users')->with('error', 'Staff member not found.');
+    if (!$user) {
+        return redirect()->to('/users')->with('error', 'Staff member not found.');
+    }
+
+    $db = \Config\Database::connect();
+
+    // Automatically pick another user to inherit past sales (prefer 'owner', otherwise any other user)
+    $fallbackRow = $db->table('users')
+        ->select('id')
+        ->where('id !=', $userId)
+        ->where('role', 'owner')
+        ->orderBy('id', 'ASC')
+        ->get()
+        ->getRowArray();
+
+    if (!$fallbackRow) {
+        $fallbackRow = $db->table('users')
+            ->select('id')
+            ->where('id !=', $userId)
+            ->orderBy('id', 'ASC')
+            ->get()
+            ->getRowArray();
+    }
+
+    $fallbackUserId = $fallbackRow ? (int) $fallbackRow['id'] : null;
+
+    try {
+        $db->transStart();
+
+        if ($db->tableExists('sales') && in_array('sold_by', $db->getFieldNames('sales'), true)) {
+            $hasSales = $db->table('sales')->where('sold_by', $userId)->countAllResults() > 0;
+
+            if ($hasSales) {
+                if ($fallbackUserId === null) {
+                    throw new \RuntimeException('No other user account exists to reassign past sales records.');
+                }
+
+                $db->table('sales')
+                    ->where('sold_by', $userId)
+                    ->update(['sold_by' => $fallbackUserId]);
+            }
+        }
+
+        $this->userModel->delete($userId);
+
+        $db->transComplete();
+
+        if ($db->transStatus() === false) {
+            throw new \RuntimeException('Database transaction failed while deleting user.');
         }
 
         if (!empty($user['avatar'])) {
@@ -194,8 +246,19 @@ class UserController extends BaseController
             }
         }
 
-        $this->userModel->delete($id);
+        return redirect()->to('/users')->with('message', 'Staff member deleted and past sales reassigned successfully.');
+    } catch (\Throwable $e) {
+        if ($db->transStatus() === false) {
+            $db->transRollback();
+        }
 
-        return redirect()->to('/users')->with('message', 'Staff member deleted successfully.');
+        log_message('error', 'Failed to delete user #' . $userId . ': ' . $e->getMessage());
+
+        return redirect()->to('/users')->with(
+            'error',
+            'Could not delete user: ' . $e->getMessage()
+        );
     }
+}
+
 }

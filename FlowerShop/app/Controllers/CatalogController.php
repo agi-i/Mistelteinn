@@ -156,83 +156,87 @@ class CatalogController extends BaseController
         $db = Database::connect();
         $productModel = new ProductModel();
 
-        $db->transStart();
+        // Resolve sold_by from session or fallback to first available user ID if FK exists
+        $soldBy = (int) (session()->get('user_id') ?? session()->get('id') ?? 0);
+        if ($soldBy <= 0 && $db->tableExists('users')) {
+            $firstUser = $db->table('users')->select('id')->orderBy('id', 'ASC')->get()->getRowArray();
+            $soldBy = (int) ($firstUser['id'] ?? 0);
+        }
 
-        $totalAmount = 0.0;
-        $lineItems = [];
+        $customerIdPost = (int) ($this->request->getPost('customer_id') ?? 0);
+        $customerId = $customerIdPost > 0 ? $customerIdPost : null;
+        $now = date('Y-m-d H:i:s');
 
-        foreach ($cart as $productId => $item) {
-            $product = $productModel->find((int) $productId);
-            $qty = (int) ($item['quantity'] ?? 0);
+        $db->transBegin();
 
-            if (!$product || $qty < 1) {
-                $db->transRollback();
-                return redirect()->to('/cart')->with('error', 'One of the items in your cart is invalid.');
+        try {
+            $insertedCount = 0;
+
+            foreach ($cart as $productId => $item) {
+                $product = $productModel->find((int) $productId);
+                $qty = (int) ($item['quantity'] ?? 0);
+
+                if (!$product || $qty < 1) {
+                    throw new \RuntimeException('One of the items in your cart is invalid.');
+                }
+
+                $currentStock = (int) ($product['stock_quantity'] ?? 0);
+                if ($qty > $currentStock) {
+                    throw new \RuntimeException(
+                        'Not enough stock for "' . $product['name'] . '" (' . $currentStock . ' available).'
+                    );
+                }
+
+                $unitPrice = (float) ($product['price'] ?? 0);
+                $lineTotal = round($unitPrice * $qty, 2);
+
+                $stockUpdated = $db->table('products')
+                    ->where('id', (int) $product['id'])
+                    ->where('stock_quantity >=', $qty)
+                    ->set('stock_quantity', 'stock_quantity - ' . $qty, false)
+                    ->update();
+
+                if ($stockUpdated === false) {
+                    $dbErr = $db->error();
+                    throw new \RuntimeException($dbErr['message'] ?: 'Failed updating product stock.');
+                }
+
+                $saleRow = [
+                    'product_id'  => (int) $product['id'],
+                    'customer_id' => $customerId,
+                    'sold_by'     => $soldBy,
+                    'quantity'    => $qty,
+                    'total_price' => $lineTotal,
+                    'created_at'  => $now,
+                ];
+
+                $saleInserted = $db->table('sales')->insert($saleRow);
+                if ($saleInserted === false) {
+                    $dbErr = $db->error();
+                    throw new \RuntimeException($dbErr['message'] ?: 'Failed inserting into sales table.');
+                }
+
+                $insertedCount++;
             }
 
-            $currentStock = (int) ($product['stock_quantity'] ?? 0);
-            if ($qty > $currentStock) {
-                $db->transRollback();
-                return redirect()->to('/cart')->with('error', 'Not enough stock for "' . $product['name'] . '" (' . $currentStock . ' available).');
+            if ($db->transStatus() === false) {
+                $dbErr = $db->error();
+                throw new \RuntimeException($dbErr['message'] ?: 'Transaction status returned false.');
             }
 
-            $unitPrice = (float) ($product['price'] ?? 0);
-            $lineTotal = $unitPrice * $qty;
-            $totalAmount += $lineTotal;
+            $db->transCommit();
+            session()->remove('cart');
 
-            $productModel->update((int) $product['id'], [
-                'stock_quantity' => $currentStock - $qty,
-            ]);
+            return redirect()->to('/sales')->with(
+                'message',
+                'Checkout completed (' . $insertedCount . ' item(s) recorded).'
+            );
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Checkout failed: ' . $e->getMessage());
 
-            $lineItems[] = [
-                'product_id' => (int) $product['id'],
-                'quantity'   => $qty,
-                'price'      => $unitPrice,
-                'subtotal'   => $lineTotal,
-            ];
+            return redirect()->to('/cart')->with('error', 'Checkout failed: ' . $e->getMessage());
         }
-
-        $customerId = (int) ($this->request->getPost('customer_id') ?? 0);
-        $userId     = (int) (session()->get('user_id') ?? 0);
-
-        $saleData = [
-            'total_amount' => $totalAmount,
-            'status'       => 'Completed',
-            'created_at'   => date('Y-m-d H:i:s'),
-        ];
-
-        if ($customerId > 0) {
-            $saleData['customer_id'] = $customerId;
-        }
-        if ($userId > 0) {
-            $saleData['user_id'] = $userId;
-        }
-
-        $db->table('sales')->insert($saleData);
-        $saleId = (int) $db->insertID();
-
-        // Insert into sale_items if that table exists in your database
-        if ($saleId > 0 && $db->tableExists('sale_items')) {
-            foreach ($lineItems as $line) {
-                $db->table('sale_items')->insert([
-                    'sale_id'    => $saleId,
-                    'product_id' => $line['product_id'],
-                    'quantity'   => $line['quantity'],
-                    'price'      => $line['price'],
-                    'subtotal'   => $line['subtotal'],
-                ]);
-            }
-        }
-
-        $db->transComplete();
-
-        if ($db->transStatus() === false) {
-            return redirect()->to('/cart')->with('error', 'Checkout failed. Please try again.');
-        }
-
-        session()->remove('cart');
-
-        return redirect()->to('/sales')->with('message', 'Sale #' . $saleId . ' completed successfully.');
     }
 
     private function resolveProductImage(?string $filename): string

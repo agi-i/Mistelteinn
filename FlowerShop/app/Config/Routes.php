@@ -10,11 +10,15 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'Pages::index');
 $routes->get('about', 'Pages::about');
 // Customer Routes
+
 $routes->get('customers', 'CustomerController::index');
 $routes->get('customers/new', 'CustomerController::new');
+$routes->post('customers', 'CustomerController::create');
 $routes->post('customers/create', 'CustomerController::create');
 $routes->get('customers/edit/(:num)', 'CustomerController::edit/$1');
 $routes->post('customers/update/(:num)', 'CustomerController::update/$1');
+$routes->put('customers/(:num)', 'CustomerController::update/$1');
+$routes->post('customers/delete/(:num)', 'CustomerController::delete/$1');
 
 //Product Routes
 $routes->get('products', 'ProductController::index');              // List all products
@@ -34,11 +38,15 @@ $routes->get('sales/(:num)', 'SaleController::show/$1');
 $routes->delete('sales/(:num)', 'SaleController::delete/$1');
 
 // User Routes
+
 $routes->get('users', 'UserController::index');
 $routes->get('users/new', 'UserController::new');
-$routes->post('users/create', 'UserController::create');
+$routes->post('users', 'UserController::create');
 $routes->get('users/edit/(:num)', 'UserController::edit/$1');
-$routes->post('users/update/(:num)', 'UserController::update/$1');
+$routes->put('users/(:num)', 'UserController::update/$1');
+$routes->post('users/(:num)', 'UserController::update/$1');
+$routes->delete('users/(:num)', 'UserController::delete/$1');
+$routes->post('users/delete/(:num)', 'UserController::delete/$1');
 
 //Catalog Router
 $routes->get('catalog', 'CatalogController::index');

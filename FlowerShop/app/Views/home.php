@@ -14,7 +14,7 @@
         align-items: center;
         flex-wrap: wrap;
         gap: 18px;
-        border-bottom: 4px solid #1abc9c;
+        border-bottom: 4px solid #1c8ff7;
     }
     .hero h1 {
         margin: 0 0 8px 0;
