@@ -29,13 +29,15 @@ $routes->put('products/(:num)', 'ProductController::update/$1');    // Update ex
 $routes->post('products/(:num)', 'ProductController::update/$1');   // Fallback if form posts directly without method spoofing
 $routes->delete('products/(:num)', 'ProductController::delete/$1'); // Delete product (via _method=DELETE)
 
-//Sales Routes
+
 // Sales routes
 $routes->get('sales', 'SaleController::index');
 $routes->get('sales/new', 'SaleController::new');
 $routes->post('sales', 'SaleController::create');
 $routes->get('sales/(:num)', 'SaleController::show/$1');
+$routes->get('sales/show/(:num)', 'SaleController::show/$1');
 $routes->delete('sales/(:num)', 'SaleController::delete/$1');
+$routes->post('sales/delete/(:num)', 'SaleController::delete/$1');
 
 // User Routes
 
@@ -52,6 +54,7 @@ $routes->post('users/delete/(:num)', 'UserController::delete/$1');
 $routes->get('catalog', 'CatalogController::index');
 $routes->post('cart/add', 'CatalogController::addToCart');
 $routes->get('cart', 'CatalogController::cart');
+$routes->post('cart/options', 'CatalogController::saveOptions');
 $routes->post('cart/update', 'CatalogController::updateCart');
 $routes->post('cart/remove', 'CatalogController::removeFromCart');
 $routes->post('cart/clear', 'CatalogController::clearCart');

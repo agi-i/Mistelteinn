@@ -22,6 +22,19 @@ class CatalogController extends BaseController
         ]);
     }
 
+    public function saveOptions()
+    {
+        $options = $this->normalizeCheckoutOptions(
+            $this->request->getPost('payment_method'),
+            $this->request->getPost('has_flower_note'),
+            $this->request->getPost('note')
+        );
+
+        session()->set('checkout_options', $options);
+
+        return redirect()->back()->with('message', 'Order options updated.');
+    }
+
     public function addToCart()
     {
         $productId = (int) $this->request->getPost('product_id');
@@ -37,6 +50,20 @@ class CatalogController extends BaseController
         $stockQty = (int) ($product['stock_quantity'] ?? 0);
         if ($stockQty <= 0 || $quantity < 1) {
             return redirect()->to('/catalog')->with('error', 'Invalid quantity or product is out of stock.');
+        }
+
+        // Persist payment method & optional flower note if supplied from catalog
+        if (
+            $this->request->getPost('payment_method') !== null
+            || $this->request->getPost('has_flower_note') !== null
+            || $this->request->getPost('note') !== null
+        ) {
+            $options = $this->normalizeCheckoutOptions(
+                $this->request->getPost('payment_method'),
+                $this->request->getPost('has_flower_note'),
+                $this->request->getPost('note')
+            );
+            session()->set('checkout_options', $options);
         }
 
         $cart = session()->get('cart') ?? [];
@@ -153,8 +180,22 @@ class CatalogController extends BaseController
             return redirect()->to('/cart')->with('error', 'Your cart is empty.');
         }
 
+        $savedOptions = session()->get('checkout_options') ?? [];
+
+        $postPayment = $this->request->getPost('payment_method');
+        $postHasNote = $this->request->getPost('has_flower_note');
+        $postNote    = $this->request->getPost('note');
+
+        $options = $this->normalizeCheckoutOptions(
+            $postPayment !== null ? $postPayment : ($savedOptions['payment_method'] ?? 'cash'),
+            $postHasNote !== null ? $postHasNote : ($savedOptions['has_flower_note'] ?? false),
+            $postNote !== null ? $postNote : ($savedOptions['note'] ?? '')
+        );
+
         $db = Database::connect();
         $productModel = new ProductModel();
+        $hasPaymentColumn = $db->fieldExists('payment_method', 'sales');
+        $hasNoteColumn    = $db->fieldExists('note', 'sales');
 
         // Resolve sold_by from session or fallback to first available user ID if FK exists
         $soldBy = (int) (session()->get('user_id') ?? session()->get('id') ?? 0);
@@ -210,6 +251,14 @@ class CatalogController extends BaseController
                     'created_at'  => $now,
                 ];
 
+                if ($hasPaymentColumn) {
+                    $saleRow['payment_method'] = $options['payment_method'];
+                }
+
+                if ($hasNoteColumn) {
+                    $saleRow['note'] = $options['note'];
+                }
+
                 $saleInserted = $db->table('sales')->insert($saleRow);
                 if ($saleInserted === false) {
                     $dbErr = $db->error();
@@ -226,6 +275,7 @@ class CatalogController extends BaseController
 
             $db->transCommit();
             session()->remove('cart');
+            session()->remove('checkout_options');
 
             return redirect()->to('/sales')->with(
                 'message',
@@ -237,6 +287,29 @@ class CatalogController extends BaseController
 
             return redirect()->to('/cart')->with('error', 'Checkout failed: ' . $e->getMessage());
         }
+    }
+
+    private function normalizeCheckoutOptions($paymentMethod, $hasFlowerNote, $note): array
+    {
+        $allowedPayments = ['cash', 'card', 'ewallet'];
+        $payment = strtolower(trim((string) ($paymentMethod ?? 'cash')));
+        if (!in_array($payment, $allowedPayments, true)) {
+            $payment = 'cash';
+        }
+
+        $wantsNote = filter_var($hasFlowerNote, FILTER_VALIDATE_BOOLEAN);
+        $cleanNote = trim((string) ($note ?? ''));
+        if (mb_strlen($cleanNote) > 500) {
+            $cleanNote = mb_substr($cleanNote, 0, 500);
+        }
+
+        $finalNote = ($wantsNote && $cleanNote !== '') ? $cleanNote : null;
+
+        return [
+            'payment_method'  => $payment,
+            'has_flower_note' => $finalNote !== null,
+            'note'            => $finalNote,
+        ];
     }
 
     private function resolveProductImage(?string $filename): string

@@ -1,24 +1,5 @@
 <?= view('partials/header', ['pageTitle' => 'Sales - Mistelteinn']) ?>
 
-<style>
-    nav a {
-        font-size: 15px;
-    }
-    h1 {
-        font-size: 24px;
-    }
-    h2 {
-        font-size: 18px;
-    }
-    p,
-    th,
-    td,
-    .btn,
-    .badge {
-        font-size: 14px;
-    }
-</style>
-
 <div class="card">
     <div class="page-header">
         <div class="header-left">
@@ -43,9 +24,9 @@
                 <tr>
                     <th>Sale ID</th>
                     <th>Customer</th>
-                    <th>Cashier / User</th>
+                    <th>Flower Note</th>
+                    <th>Payment Method</th>
                     <th>Total Amount</th>
-                    <th>Status</th>
                     <th>Date</th>
                     <th>Actions</th>
                 </tr>
@@ -54,25 +35,33 @@
                 <?php if (!empty($sales)): ?>
                     <?php foreach ($sales as $sale): ?>
                         <?php
-                        $totalAmount  = (float) ($sale['total_amount'] ?? $sale['total'] ?? 0);
-                        $customerName = $sale['customer_name'] ?? $sale['customer'] ?? 'Walk-in Customer';
-                        $userName     = $sale['user_name'] ?? $sale['cashier_name'] ?? $sale['user'] ?? 'Staff';
-                        $status       = $sale['status'] ?? 'Completed';
-                        $createdAt    = $sale['created_at'] ?? $sale['sale_date'] ?? '—';
+                        $saleId = (int) ($sale['id'] ?? 0);
+                        $amount = (float) ($sale['total_price'] ?? $sale['total_amount'] ?? 0);
+                        $paymentLabel = strtoupper((string) ($sale['payment_method'] ?? 'cash'));
                         ?>
                         <tr>
-                            <td><strong>#<?= esc($sale['id'] ?? '') ?></strong></td>
-                            <td><?= esc($customerName) ?></td>
-                            <td><?= esc($userName) ?></td>
-                            <td><strong><?= number_format($totalAmount, 2) ?></strong></td>
-                            <td><span class="badge"><?= esc(ucfirst($status)) ?></span></td>
-                            <td><?= esc($createdAt) ?></td>
+                            <td><strong>#<?= $saleId ?></strong></td>
+                            <td><?= esc($sale['customer_name'] ?? 'Walk-in Customer') ?></td>
+                            <td>
+                                <?php if (!empty($sale['note'])): ?>
+                                    <?= esc($sale['note']) ?>
+                                <?php else: ?>
+                                    <span style="color: #888;">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= esc($paymentLabel) ?></td>
+                            <td><strong><?= number_format($amount, 2) ?></strong></td>
+                            <td><?= esc($sale['created_at'] ?? '—') ?></td>
                             <td>
                                 <div class="btn-group">
-                                    <a href="<?= base_url('/sales/' . esc($sale['id'])) ?>" class="btn">View</a>
-                                    <form action="<?= base_url('/sales/' . esc($sale['id'])) ?>" method="post" onsubmit="return confirm('Delete this sale record?');" style="margin:0;">
+                                    <a href="<?= base_url('/sales/show/' . $saleId) ?>" class="btn">View</a>
+                                    <form
+                                        action="<?= base_url('/sales/delete/' . $saleId) ?>"
+                                        method="post"
+                                        style="display: inline;"
+                                        onsubmit="return confirm('Delete Sale #<?= $saleId ?>?');"
+                                    >
                                         <?= csrf_field() ?>
-                                        <input type="hidden" name="_method" value="DELETE">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
@@ -81,7 +70,7 @@
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="7">No sales found.</td>
+                        <td colspan="7">No sales recorded yet.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>

@@ -4,6 +4,13 @@ $cartCount = 0;
 foreach ($cartItems as $item) {
     $cartCount += (int) ($item['quantity'] ?? 0);
 }
+
+$savedCheckout = session()->get('checkout_options') ?? [];
+$selectedPayment = old('payment_method') ?? ($savedCheckout['payment_method'] ?? 'cash');
+$savedNote = old('note') ?? ($savedCheckout['note'] ?? '');
+$hasNoteOption = old('has_flower_note') !== null
+    ? (bool) old('has_flower_note')
+    : (!empty($savedCheckout['has_flower_note']) || $savedNote !== '');
 ?>
 <?= view('partials/header', ['pageTitle' => 'Catalog - Mistelteinns']) ?>
 
@@ -34,6 +41,91 @@ foreach ($cartItems as $item) {
         padding: 2px 8px;
         border-radius: 999px;
         font-size: 12px;
+    }
+
+    /* Order / Flower Note & Payment Options Panel */
+    .catalog-order-panel {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 16px 18px;
+        margin-bottom: 20px;
+    }
+    .catalog-order-panel h2 {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        color: #2c3e50;
+    }
+    .order-options-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        align-items: start;
+    }
+    .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .field-label {
+        font-size: 13px;
+        font-weight: bold;
+        color: #334155;
+    }
+    .field-select,
+    .field-textarea {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 5px;
+        padding: 8px 10px;
+        font-size: 14px;
+        color: #1e293b;
+        background: #ffffff;
+        box-sizing: border-box;
+    }
+    .field-textarea {
+        resize: vertical;
+        min-height: 76px;
+        font-family: inherit;
+    }
+    .checkbox-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: bold;
+        color: #2c3e50;
+        cursor: pointer;
+        user-select: none;
+    }
+    .note-box {
+        margin-top: 8px;
+    }
+    .panel-actions {
+        margin-top: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .btn-save-options {
+        background: #2c3e50;
+        color: #ffffff;
+        border: none;
+        border-radius: 5px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+    .btn-save-options:hover {
+        background: #16a085;
+    }
+    .option-hint {
+        font-size: 12px;
+        color: #64748b;
     }
 
     /* Catalog Grid & Cards */
@@ -192,6 +284,56 @@ foreach ($cartItems as $item) {
         <div class="alert alert-error"><?= esc(session()->getFlashdata('error')) ?></div>
     <?php endif; ?>
 
+    <!-- Customer Order Preferences: Payment Method & Optional Flower Note -->
+    <section class="catalog-order-panel" aria-label="Order Preferences">
+        <h2>Order Options</h2>
+        <form action="<?= base_url('/cart/options') ?>" method="post" id="catalog-options-form">
+            <?= csrf_field() ?>
+
+            <div class="order-options-grid">
+                <div class="field-group">
+                    <label for="catalog_payment_method" class="field-label">Payment Method</label>
+                    <select id="catalog_payment_method" name="payment_method" class="field-select">
+                        <option value="cash" <?= $selectedPayment === 'cash' ? 'selected' : '' ?>>Cash</option>
+                        <option value="card" <?= $selectedPayment === 'card' ? 'selected' : '' ?>>Card</option>
+                        <option value="ewallet" <?= $selectedPayment === 'ewallet' ? 'selected' : '' ?>>E-Wallet (GCash / Maya)</option>
+                    </select>
+                </div>
+
+                <div class="field-group">
+                    <label class="checkbox-label">
+                        <input
+                            type="checkbox"
+                            id="catalog_has_flower_note"
+                            name="has_flower_note"
+                            value="1"
+                            <?= $hasNoteOption ? 'checked' : '' ?>
+                        >
+                        <span>Add a note with the flowers?</span>
+                    </label>
+
+                    <div id="catalog_flower_note_box" class="note-box" style="<?= $hasNoteOption ? '' : 'display: none;' ?>">
+                        <label for="catalog_flower_note" class="field-label">Flower / Card Note</label>
+                        <textarea
+                            id="catalog_flower_note"
+                            name="note"
+                            class="field-textarea"
+                            maxlength="500"
+                            placeholder="Write a card message or arrangement note for your flowers..."
+                        ><?= esc($savedNote) ?></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel-actions">
+                <span class="option-hint">
+                    These choices carry over when adding items and completing checkout.
+                </span>
+                <button type="submit" class="btn-save-options">Save Options</button>
+            </div>
+        </form>
+    </section>
+
     <?php if (!empty($products)): ?>
         <div class="product-grid">
             <?php foreach ($products as $product): ?>
@@ -221,6 +363,9 @@ foreach ($cartItems as $item) {
                         <form action="<?= base_url('/cart/add') ?>" method="post" class="cart-form">
                             <?= csrf_field() ?>
                             <input type="hidden" name="product_id" value="<?= $productId ?>">
+                            <input type="hidden" name="payment_method" class="sync-payment-input" value="<?= esc($selectedPayment) ?>">
+                            <input type="hidden" name="has_flower_note" class="sync-has-note-input" value="<?= $hasNoteOption ? '1' : '0' ?>">
+                            <input type="hidden" name="note" class="sync-note-input" value="<?= esc($savedNote) ?>">
 
                             <div class="qty-control">
                                 <button
@@ -270,6 +415,49 @@ foreach ($cartItems as $item) {
     </div>
 
     <script>
+        (function () {
+            const paymentSelect = document.getElementById('catalog_payment_method');
+            const noteCheckbox = document.getElementById('catalog_has_flower_note');
+            const noteBox = document.getElementById('catalog_flower_note_box');
+            const noteTextarea = document.getElementById('catalog_flower_note');
+
+            function syncCatalogOptionsToCartForms() {
+                const paymentVal = paymentSelect ? paymentSelect.value : 'cash';
+                const hasNoteVal = noteCheckbox && noteCheckbox.checked ? '1' : '0';
+                const noteVal = (noteCheckbox && noteCheckbox.checked && noteTextarea)
+                    ? noteTextarea.value
+                    : '';
+
+                if (noteBox && noteCheckbox) {
+                    noteBox.style.display = noteCheckbox.checked ? '' : 'none';
+                    if (!noteCheckbox.checked && noteTextarea) {
+                        noteTextarea.value = '';
+                    }
+                }
+
+                document.querySelectorAll('.cart-form').forEach(function (form) {
+                    const pInput = form.querySelector('.sync-payment-input');
+                    const hInput = form.querySelector('.sync-has-note-input');
+                    const nInput = form.querySelector('.sync-note-input');
+                    if (pInput) pInput.value = paymentVal;
+                    if (hInput) hInput.value = hasNoteVal;
+                    if (nInput) nInput.value = noteVal;
+                });
+            }
+
+            if (paymentSelect) {
+                paymentSelect.addEventListener('change', syncCatalogOptionsToCartForms);
+            }
+            if (noteCheckbox) {
+                noteCheckbox.addEventListener('change', syncCatalogOptionsToCartForms);
+            }
+            if (noteTextarea) {
+                noteTextarea.addEventListener('input', syncCatalogOptionsToCartForms);
+            }
+
+            syncCatalogOptionsToCartForms();
+        })();
+
         document.querySelectorAll('.cart-form').forEach(function (form) {
             const minusBtn = form.querySelector('.btn-minus');
             const plusBtn  = form.querySelector('.btn-plus');

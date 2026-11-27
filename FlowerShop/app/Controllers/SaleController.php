@@ -5,36 +5,22 @@ namespace App\Controllers;
 use App\Models\CustomerModel;
 use App\Models\ProductModel;
 use CodeIgniter\Model;
+use Config\Database;
 
-/**
- * Inline SaleModel & SaleItemModel so you can run immediately.
- * Adjust $table and $allowedFields if your database columns differ.
- */
 class SaleModel extends Model
 {
     protected $table = 'sales';
     protected $primaryKey = 'id';
     protected $returnType = 'array';
     protected $allowedFields = [
-        'customer_id',
-        'user_id',
-        'total_amount',
-        'payment_method',
-    ];
-    protected $useTimestamps = false;
-}
-
-class SaleItemModel extends Model
-{
-    protected $table = 'sale_items';
-    protected $primaryKey = 'id';
-    protected $returnType = 'array';
-    protected $allowedFields = [
-        'sale_id',
         'product_id',
+        'customer_id',
+        'sold_by',
         'quantity',
-        'unit_price',
-        'subtotal',
+        'total_price',
+        'created_at',
+        'note',
+        'payment_method',
     ];
     protected $useTimestamps = false;
 }
@@ -42,14 +28,12 @@ class SaleItemModel extends Model
 class SaleController extends BaseController
 {
     protected SaleModel $saleModel;
-    protected SaleItemModel $saleItemModel;
     protected CustomerModel $customerModel;
     protected ProductModel $productModel;
 
     public function __construct()
     {
         $this->saleModel     = new SaleModel();
-        $this->saleItemModel = new SaleItemModel();
         $this->customerModel = new CustomerModel();
         $this->productModel  = new ProductModel();
     }
@@ -58,8 +42,9 @@ class SaleController extends BaseController
     public function index()
     {
         $sales = $this->saleModel
-            ->select('sales.*, customers.full_name AS customer_name')
+            ->select('sales.*, customers.full_name AS customer_name, products.name AS product_name')
             ->join('customers', 'customers.id = sales.customer_id', 'left')
+            ->join('products', 'products.id = sales.product_id', 'left')
             ->orderBy('sales.id', 'DESC')
             ->findAll();
 
@@ -80,16 +65,25 @@ class SaleController extends BaseController
         ]);
     }
 
-    // CREATE ACTION: Save sale, save line items, and deduct stock
+    // CREATE ACTION: Save sale row(s), log sale_items, save note & payment_method, and deduct stock
     public function create()
     {
         $productIds = $this->request->getPost('product_id') ?? [];
         $quantities = $this->request->getPost('quantity') ?? [];
-        $customerId = $this->request->getPost('customer_id');
-        $payment    = $this->request->getPost('payment_method') ?: 'cash';
+        $customerIdPost = (int) ($this->request->getPost('customer_id') ?? 0);
+        $customerId = $customerIdPost > 0 ? $customerIdPost : null;
+
+        $allowedPayments = ['cash', 'card', 'ewallet'];
+        $payment = strtolower(trim((string) ($this->request->getPost('payment_method') ?? 'cash')));
+        if (!in_array($payment, $allowedPayments, true)) {
+            $payment = 'cash';
+        }
+
+        $hasNote = (bool) $this->request->getPost('has_flower_note');
+        $rawNote = trim((string) ($this->request->getPost('note') ?? ''));
+        $note    = ($hasNote || $rawNote !== '') && $rawNote !== '' ? mb_substr($rawNote, 0, 500) : null;
 
         $itemsToSave = [];
-        $grandTotal  = 0;
 
         foreach ($productIds as $idx => $prodId) {
             $qty = (int) ($quantities[$idx] ?? 0);
@@ -97,7 +91,7 @@ class SaleController extends BaseController
                 continue;
             }
 
-            $product = $this->productModel->find($prodId);
+            $product = $this->productModel->find((int) $prodId);
             if (!$product) {
                 continue;
             }
@@ -109,77 +103,140 @@ class SaleController extends BaseController
                 );
             }
 
-            $unitPrice   = (float) $product['price'];
-            $subtotal    = $unitPrice * $qty;
-            $grandTotal += $subtotal;
+            $unitPrice = (float) $product['price'];
+            $lineTotal = round($unitPrice * $qty, 2);
 
             $itemsToSave[] = [
-                'product'    => $product,
-                'product_id' => (int) $product['id'],
-                'quantity'   => $qty,
-                'unit_price' => $unitPrice,
-                'subtotal'   => $subtotal,
+                'product'     => $product,
+                'product_id'  => (int) $product['id'],
+                'quantity'    => $qty,
+                'unit_price'  => $unitPrice,
+                'total_price' => $lineTotal,
             ];
         }
 
         if (empty($itemsToSave)) {
-            return redirect()->back()->withInput()->with('error', 'Please select at least one product with a valid quantity.');
+            return redirect()->back()->withInput()->with(
+                'error',
+                'Please select a flower/product from the dropdown and enter a valid quantity.'
+            );
         }
 
-        $db = \Config\Database::connect();
-        $db->transStart();
+        $db = Database::connect();
 
-        // Insert sale header
-        $saleId = $this->saleModel->insert([
-            'customer_id'    => ($customerId === '' || $customerId === null) ? null : (int) $customerId,
-            'user_id'        => session()->get('user_id') ?? null,
-            'total_amount'   => $grandTotal,
-            'payment_method' => $payment,
-        ], true);
-
-        // Insert line items and deduct product stock
-        foreach ($itemsToSave as $item) {
-            $this->saleItemModel->insert([
-                'sale_id'    => $saleId,
-                'product_id' => $item['product_id'],
-                'quantity'   => $item['quantity'],
-                'unit_price' => $item['unit_price'],
-                'subtotal'   => $item['subtotal'],
-            ]);
-
-            $newStock = max(0, (int) $item['product']['stock_quantity'] - $item['quantity']);
-            $this->productModel->update($item['product_id'], [
-                'stock_quantity' => $newStock,
-            ]);
+        // Resolve sold_by (NOT NULL in sales table)
+        $soldBy = (int) (session()->get('user_id') ?? session()->get('id') ?? 0);
+        if ($soldBy <= 0 && $db->tableExists('users')) {
+            $firstUser = $db->table('users')->select('id')->orderBy('id', 'ASC')->get()->getRowArray();
+            $soldBy = (int) ($firstUser['id'] ?? 0);
         }
 
-        $db->transComplete();
-
-        if ($db->transStatus() === false) {
-            return redirect()->back()->withInput()->with('error', 'Failed to record sale. Please try again.');
+        if ($soldBy <= 0) {
+            return redirect()->back()->withInput()->with(
+                'error',
+                'Could not determine staff/user ID (sold_by) for this sale.'
+            );
         }
 
-        return redirect()->to('/sales')->with('message', 'Sale #' . $saleId . ' recorded successfully.');
+        $hasSaleItemsTable = $db->tableExists('sale_items');
+        $now = date('Y-m-d H:i:s');
+        $db->transBegin();
+
+        try {
+            $insertedCount = 0;
+
+            foreach ($itemsToSave as $item) {
+                $stockUpdated = $db->table('products')
+                    ->where('id', $item['product_id'])
+                    ->where('stock_quantity >=', $item['quantity'])
+                    ->set('stock_quantity', 'stock_quantity - ' . $item['quantity'], false)
+                    ->update();
+
+                if ($stockUpdated === false) {
+                    $dbErr = $db->error();
+                    throw new \RuntimeException($dbErr['message'] ?: 'Failed updating product stock.');
+                }
+
+                $saleId = $this->saleModel->insert([
+                    'product_id'     => $item['product_id'],
+                    'customer_id'    => $customerId,
+                    'sold_by'        => $soldBy,
+                    'quantity'       => $item['quantity'],
+                    'total_price'    => $item['total_price'],
+                    'created_at'     => $now,
+                    'note'           => $note,
+                    'payment_method' => $payment,
+                ], true);
+
+                if (!$saleId) {
+                    $dbErr = $db->error();
+                    throw new \RuntimeException($dbErr['message'] ?: 'Failed inserting into sales table.');
+                }
+
+                if ($hasSaleItemsTable) {
+                    $itemInserted = $db->table('sale_items')->insert([
+                        'sale_id'    => (int) $saleId,
+                        'product_id' => $item['product_id'],
+                        'quantity'   => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'subtotal'   => $item['total_price'],
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+
+                    if ($itemInserted === false) {
+                        $dbErr = $db->error();
+                        throw new \RuntimeException($dbErr['message'] ?: 'Failed inserting into sale_items table.');
+                    }
+                }
+
+                $insertedCount++;
+            }
+
+            if ($db->transStatus() === false) {
+                $dbErr = $db->error();
+                throw new \RuntimeException($dbErr['message'] ?: 'Transaction failed.');
+            }
+
+            $db->transCommit();
+
+            return redirect()->to('/sales')->with(
+                'message',
+                'Sale recorded successfully (' . $insertedCount . ' item(s)).'
+            );
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'SaleController::create failed: ' . $e->getMessage());
+
+            return redirect()->back()->withInput()->with(
+                'error',
+                'Failed to record sale: ' . $e->getMessage()
+            );
+        }
     }
 
-    // SHOW: View single sale receipt & items
+    // SHOW: View single sale details, payment method, and flower note
     public function show($id = null)
     {
         $sale = $this->saleModel
-            ->select('sales.*, customers.full_name AS customer_name')
+            ->select('sales.*, customers.full_name AS customer_name, products.name AS product_name, products.price AS unit_price')
             ->join('customers', 'customers.id = sales.customer_id', 'left')
-            ->where('sales.id', $id)
+            ->join('products', 'products.id = sales.product_id', 'left')
+            ->where('sales.id', (int) $id)
             ->first();
 
         if (!$sale) {
             return redirect()->to('/sales')->with('error', 'Sale record not found.');
         }
 
-        $items = $this->saleItemModel
-            ->select('sale_items.*, products.name AS product_name, products.sku')
-            ->join('products', 'products.id = sale_items.product_id', 'left')
-            ->where('sale_items.sale_id', $id)
-            ->findAll();
+        $items = [[
+            'product_name' => $sale['product_name'] ?? ('Product #' . ($sale['product_id'] ?? '')),
+            'quantity'     => (int) ($sale['quantity'] ?? 1),
+            'unit_price'   => (float) ($sale['unit_price'] ?? ($sale['total_price'] ?? 0)),
+            'subtotal'     => (float) ($sale['total_price'] ?? 0),
+        ]];
+
+        $sale['total_amount'] = (float) ($sale['total_price'] ?? 0);
 
         return view('sales/show', [
             'sale'  => $sale,
@@ -187,17 +244,22 @@ class SaleController extends BaseController
         ]);
     }
 
-    // DELETE: Remove a sale record
+    // DELETE: Remove a sale record (and its sale_items rows if present)
     public function delete($id = null)
     {
-        $sale = $this->saleModel->find($id);
+        $saleId = (int) $id;
+        $sale = $this->saleModel->find($saleId);
 
         if (!$sale) {
             return redirect()->to('/sales')->with('error', 'Sale record not found.');
         }
 
-        $this->saleItemModel->where('sale_id', $id)->delete();
-        $this->saleModel->delete($id);
+        $db = Database::connect();
+        if ($db->tableExists('sale_items')) {
+            $db->table('sale_items')->where('sale_id', $saleId)->delete();
+        }
+
+        $this->saleModel->delete($saleId);
 
         return redirect()->to('/sales')->with('message', 'Sale deleted successfully.');
     }

@@ -1,70 +1,90 @@
 <?= view('partials/header', ['pageTitle' => 'Record Sale - Mistelteinn']) ?>
 
 <style>
-    .card {
-        max-width: 900px;
-        margin: 0 auto;
-    }
-    .form-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 16px;
-        margin-bottom: 18px;
-    }
-    label {
-        display: block;
-        font-weight: bold;
-        color: #2c3e50;
-        margin-bottom: 6px;
-        font-size: 14px;
-    }
-    select,
-    input[type="number"] {
-        width: 100%;
-        padding: 9px 12px;
-        border: 1px solid #cbd5e1;
-        border-radius: 5px;
-        font-size: 14px;
-        background: #fafbfc;
-        color: #333;
-    }
-    select:focus,
-    input[type="number"]:focus {
-        outline: none;
-        border-color: #1abc9c;
-        background: #ffffff;
-        box-shadow: 0 0 0 3px rgba(26, 188, 156, 0.15);
-    }
-    table {
-        margin-top: 10px;
-    }
-    .btn-remove {
-        padding: 6px 10px;
-    }
-    .total-bar {
+    .sale-form-stack {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-top: 18px;
-        padding: 14px 18px;
-        background: #f8f9fa;
-        border-radius: 6px;
-        border: 1px solid #e1e6ea;
+        flex-direction: column;
+        gap: 18px;
     }
-    .grand-total {
-        font-size: 20px;
+    .form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .form-label {
+        font-size: 14px;
         font-weight: bold;
         color: #2c3e50;
+    }
+    .form-control,
+    .form-textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #1e293b;
+        background: #ffffff;
+        box-sizing: border-box;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .form-control:focus,
+    .form-textarea:focus {
+        outline: none;
+        border-color: #16a085;
+        box-shadow: 0 0 0 3px rgba(22, 160, 133, 0.12);
+    }
+    .form-textarea {
+        resize: vertical;
+        min-height: 84px;
+        font-family: inherit;
+    }
+    .table-control {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        font-size: 14px;
+        color: #1e293b;
+        background: #ffffff;
+        box-sizing: border-box;
+    }
+    .qty-cell-input {
+        max-width: 120px;
+        text-align: center;
+        font-weight: bold;
+    }
+    .note-panel {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 14px 16px;
+    }
+    .checkbox-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: bold;
+        color: #2c3e50;
+        cursor: pointer;
+        user-select: none;
+    }
+    .checkbox-row input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: #16a085;
+        cursor: pointer;
+    }
+    .note-collapse {
+        margin-top: 12px;
     }
     .form-actions {
         display: flex;
-        gap: 10px;
         align-items: center;
-        flex-wrap: wrap;
-        margin-top: 20px;
-        padding-top: 16px;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 14px;
         border-top: 1px solid #eef2f4;
     }
 </style>
@@ -72,7 +92,10 @@
 <div class="card">
     <div class="page-header">
         <div class="header-left">
-            <h1>Record New Sale</h1>
+            <h1>Record Sale</h1>
+        </div>
+        <div class="btn-group">
+            <a href="<?= base_url('/sales') ?>" class="btn">Back to Sales</a>
         </div>
     </div>
 
@@ -80,118 +103,126 @@
         <div class="alert alert-error"><?= esc(session()->getFlashdata('error')) ?></div>
     <?php endif; ?>
 
-    <form action="<?= base_url('/sales') ?>" method="post">
+    <?php if (session()->getFlashdata('errors')): ?>
+        <div class="alert alert-error">
+            <ul style="margin: 0; padding-left: 18px;">
+                <?php foreach (session()->getFlashdata('errors') as $err): ?>
+                    <li><?= esc($err) ?></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    <?php endif; ?>
+
+    <form action="<?= base_url('/sales') ?>" method="post" class="sale-form-stack">
         <?= csrf_field() ?>
 
-        <div class="form-row">
-            <div>
-                <label for="customer_id">Customer (Optional)</label>
-                <select id="customer_id" name="customer_id">
-                    <option value="">-- Walk-in Customer --</option>
-                    <?php if (!empty($customers)): ?>
-                        <?php foreach ($customers as $c): ?>
-                            <option value="<?= esc($c['id']) ?>"><?= esc($c['full_name']) ?></option>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </select>
-            </div>
-
-            <div>
-                <label for="payment_method">Payment Method</label>
-                <select id="payment_method" name="payment_method" required>
-                    <option value="cash">Cash</option>
-                    <option value="gcash">GCash / E-Wallet</option>
-                    <option value="card">Credit / Debit Card</option>
-                </select>
-            </div>
+        <div class="form-field">
+            <label for="customer_id" class="form-label">Customer</label>
+            <select id="customer_id" name="customer_id" class="form-control">
+                <option value="">Walk-in Customer</option>
+                <?php foreach ($customers ?? [] as $customer): ?>
+                    <option value="<?= (int) $customer['id'] ?>" <?= old('customer_id') == $customer['id'] ? 'selected' : '' ?>>
+                        <?= esc($customer['full_name']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
         </div>
 
-        <label>Line Items</label>
-        <div class="table-responsive">
-            <table id="itemsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 48%;">Product</th>
-                        <th style="width: 18%;">Unit Price</th>
-                        <th style="width: 14%;">Qty</th>
-                        <th style="width: 14%;">Subtotal</th>
-                        <th style="width: 6%;"></th>
-                    </tr>
-                </thead>
-                <tbody id="itemsBody">
-                    <tr class="item-row">
-                        <td>
-                            <select name="product_id[]" class="product-select" required onchange="recalc()">
-                                <option value="" data-price="0">-- Select Product --</option>
-                                <?php if (!empty($products)): ?>
-                                    <?php foreach ($products as $p): ?>
-                                        <option value="<?= esc($p['id']) ?>" data-price="<?= esc($p['price']) ?>">
-                                            <?= esc($p['name']) ?> (Stock: <?= esc($p['stock_quantity']) ?>)
+        <div class="form-field">
+            <label for="payment_method" class="form-label">Payment Method</label>
+            <select id="payment_method" name="payment_method" class="form-control">
+                <?php $selectedPayment = old('payment_method') ?: 'cash'; ?>
+                <option value="cash" <?= $selectedPayment === 'cash' ? 'selected' : '' ?>>Cash</option>
+                <option value="card" <?= $selectedPayment === 'card' ? 'selected' : '' ?>>Card</option>
+                <option value="ewallet" <?= $selectedPayment === 'ewallet' ? 'selected' : '' ?>>E-Wallet</option>
+            </select>
+        </div>
+
+        <div class="form-field">
+            <label class="form-label">Items</label>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Flower / Product</th>
+                            <th style="width: 160px;">Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sale-items-body">
+                        <tr>
+                            <td>
+                                <select name="product_id[]" class="table-control">
+                                    <option value="">-- Select Product --</option>
+                                    <?php foreach ($products ?? [] as $product): ?>
+                                        <option value="<?= (int) $product['id'] ?>">
+                                            <?= esc($product['name']) ?> (₱<?= number_format((float) $product['price'], 2) ?>, Stock: <?= (int) $product['stock_quantity'] ?>)
                                         </option>
                                     <?php endforeach; ?>
-                                <?php endif; ?>
-                            </select>
-                        </td>
-                        <td class="unit-price">0.00</td>
-                        <td>
-                            <input type="number" name="quantity[]" class="qty-input" value="1" min="1" required oninput="recalc()">
-                        </td>
-                        <td class="row-subtotal">0.00</td>
-                        <td>
-                            <button type="button" class="btn btn-danger btn-remove" onclick="removeRow(this)">X</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="number" name="quantity[]" min="1" value="1" class="table-control qty-cell-input">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="total-bar">
-            <button type="button" class="btn" onclick="addRow()">+ Add Item</button>
-            <div class="grand-total">Total: <span id="grandTotal">0.00</span></div>
+        <div class="note-panel">
+            <label class="checkbox-row">
+                <input
+                    type="checkbox"
+                    id="has_flower_note"
+                    name="has_flower_note"
+                    value="1"
+                    <?= (old('has_flower_note') || !empty(old('note'))) ? 'checked' : '' ?>
+                >
+                <span>Add a note with the flowers</span>
+            </label>
+
+            <div
+                class="note-collapse"
+                id="flower_note_container"
+                style="<?= (old('has_flower_note') || !empty(old('note'))) ? '' : 'display: none;' ?>"
+            >
+                <div class="form-field">
+                    <label for="note" class="form-label">Flower / Card Note</label>
+                    <textarea
+                        id="note"
+                        name="note"
+                        rows="3"
+                        maxlength="500"
+                        class="form-textarea"
+                        placeholder="Write a card message or arrangement note for the flowers..."
+                    ><?= esc(old('note') ?? '') ?></textarea>
+                </div>
+            </div>
         </div>
 
         <div class="form-actions">
-            <button type="submit" class="btn btn-accent">Complete Sale</button>
-            <a href="<?= base_url('/sales') ?>" class="btn btn-light">Cancel</a>
+            <button type="submit" class="btn btn-accent">Save Sale</button>
         </div>
     </form>
 </div>
 
-    </div>
+<script>
+    (function () {
+        const checkbox = document.getElementById('has_flower_note');
+        const container = document.getElementById('flower_note_container');
+        const textarea = document.getElementById('note');
 
-    <script>
-        function addRow() {
-            const tbody = document.getElementById('itemsBody');
-            const firstRow = tbody.querySelector('.item-row');
-            const clone = firstRow.cloneNode(true);
-            clone.querySelector('.product-select').selectedIndex = 0;
-            clone.querySelector('.qty-input').value = 1;
-            clone.querySelector('.unit-price').textContent = '0.00';
-            clone.querySelector('.row-subtotal').textContent = '0.00';
-            tbody.appendChild(clone);
-        }
+        if (!checkbox || !container || !textarea) return;
 
-        function removeRow(btn) {
-            const tbody = document.getElementById('itemsBody');
-            if (tbody.querySelectorAll('.item-row').length > 1) {
-                btn.closest('.item-row').remove();
-                recalc();
+        checkbox.addEventListener('change', function () {
+            container.style.display = this.checked ? '' : 'none';
+            if (!this.checked) {
+                textarea.value = '';
             }
-        }
+        });
+    })();
+</script>
 
-        function recalc() {
-            let total = 0;
-            document.querySelectorAll('.item-row').forEach(row => {
-                const select = row.querySelector('.product-select');
-                const price = parseFloat(select.options[select.selectedIndex]?.dataset.price || 0);
-                const qty = parseInt(row.querySelector('.qty-input').value || 0, 10);
-                const sub = price * qty;
-                row.querySelector('.unit-price').textContent = price.toFixed(2);
-                row.querySelector('.row-subtotal').textContent = sub.toFixed(2);
-                total += sub;
-            });
-            document.getElementById('grandTotal').textContent = total.toFixed(2);
-        }
-    </script>
+    </div>
 </body>
 </html>
