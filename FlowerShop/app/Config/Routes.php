@@ -39,3 +39,12 @@ $routes->get('users/new', 'UserController::new');
 $routes->post('users/create', 'UserController::create');
 $routes->get('users/edit/(:num)', 'UserController::edit/$1');
 $routes->post('users/update/(:num)', 'UserController::update/$1');
+
+//Catalog Router
+$routes->get('catalog', 'CatalogController::index');
+$routes->post('cart/add', 'CatalogController::addToCart');
+$routes->get('cart', 'CatalogController::cart');
+$routes->post('cart/update', 'CatalogController::updateCart');
+$routes->post('cart/remove', 'CatalogController::removeFromCart');
+$routes->post('cart/clear', 'CatalogController::clearCart');
+$routes->post('checkout', 'CatalogController::checkout');
